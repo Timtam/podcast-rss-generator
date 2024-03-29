@@ -93,9 +93,7 @@ def generate_rss(config, output_file_path):
     channel = ET.SubElement(rss, "channel")
     metadata = config["metadata"]
     ET.SubElement(channel, "title").text = metadata["title"]
-    ET.SubElement(channel, "description").text = format_description(
-        metadata["description"]
-    )
+    ET.SubElement(channel, "description").text = f"<![CDATA[{metadata["description"]}]]>"
     ET.SubElement(channel, "language").text = metadata.get("language", "en-us")
     ET.SubElement(channel, "link").text = metadata["link"]
     ET.SubElement(
