@@ -1,4 +1,4 @@
-import xml.etree.ElementTree as ET
+import lxml.etree as ET
 from datetime import datetime
 from email.utils import format_datetime
 import argparse
@@ -60,40 +60,40 @@ def format_description(description):
     Convert Markdown description to HTML
     """
     html_description = markdown.markdown(description)
-    wrapped_description = f"<![CDATA[{html_description}]]>"
 
     # Ensure byte limit for the channel description
     byte_limit = 4000
-    if len(wrapped_description.encode("utf-8")) > byte_limit:
+    if len(html_description.encode("utf-8")) > byte_limit:
         # Truncate the description if it exceeds the limit
         # Note: Truncation logic might need to be more sophisticated to handle HTML correctly
-        wrapped_description = wrapped_description[:byte_limit]
+        html_description = html_description[:byte_limit]
 
-    return wrapped_description
+    return html_description
 
 
 def generate_rss(config, output_file_path):
-    ET.register_namespace("itunes", "http://www.itunes.com/dtds/podcast-1.0.dtd")
-    ET.register_namespace("atom", "http://www.w3.org/2005/Atom")
+    #ET.register_namespace("itunes", "http://www.itunes.com/dtds/podcast-1.0.dtd")
+    #ET.register_namespace("atom", "http://www.w3.org/2005/Atom")
 
     # Global itunes:explicit setting
     global_explicit = (
         "yes" if config["metadata"].get("itunes_explicit", False) else "no"
     )
 
+    nsmap = {"itunes": "http://www.itunes.com/dtds/podcast-1.0.dtd",
+             "atom": "http://www.w3.org/2005/Atom"
+            }
+
     rss = ET.Element(
         "rss",
         version="2.0",
-        attrib={
-            "xmlns:itunes": "http://www.itunes.com/dtds/podcast-1.0.dtd",
-            "xmlns:atom": "http://www.w3.org/2005/Atom",
-        },
+        nsmap = nsmap,
     )
     # Metadata
     channel = ET.SubElement(rss, "channel")
     metadata = config["metadata"]
     ET.SubElement(channel, "title").text = metadata["title"]
-    ET.SubElement(channel, "description").text = f"<![CDATA[{metadata['description']}]]>"
+    ET.SubElement(channel, "description").text = ET.CDATA(metadata['description'])
     ET.SubElement(channel, "language").text = metadata.get("language", "en-us")
     ET.SubElement(channel, "link").text = metadata["link"]
     ET.SubElement(
@@ -103,34 +103,34 @@ def generate_rss(config, output_file_path):
     )
     ET.SubElement(
         channel,
-        "atom:link",
+        f"{{{nsmap['atom']}}}link",
         href=metadata["rss_feed_url"],
         rel="self",
         type="application/rss+xml",
     )
 
     # Adds explicit tag
-    itunes_explicit = ET.SubElement(channel, "itunes:explicit")
+    itunes_explicit = ET.SubElement(channel, f"{{{nsmap['itunes']}}}explicit")
     itunes_explicit.text = global_explicit
 
     # Add itunes:owner and itunes:email tags
-    itunes_owner = ET.SubElement(channel, "itunes:owner")
-    ET.SubElement(itunes_owner, "itunes:email").text = metadata["itunes_email"]
+    itunes_owner = ET.SubElement(channel, f"{{{nsmap['itunes']}}}owner")
+    ET.SubElement(itunes_owner, f"{{{nsmap['itunes']}}}email").text = metadata["itunes_email"]
 
     # Add itunes:author tag
-    itunes_author = ET.SubElement(channel, "itunes:author")
+    itunes_author = ET.SubElement(channel, f"{{{nsmap['itunes']}}}author")
     itunes_author.text = metadata["itunes_author"]
 
     # Duplicate description to itunes summary
-    itunes_summary = ET.SubElement(channel, "itunes:summary")
-    itunes_summary.text = metadata["description"]
+    itunes_summary = ET.SubElement(channel, f"{{{nsmap['itunes']}}}summary")
+    itunes_summary.text = ET.CDATA(metadata["description"])
 
     # Add itunes:category tag
     if "itunes_category" in metadata:
-        ET.SubElement(channel, "itunes:category", text=metadata["itunes_category"])
+        ET.SubElement(channel, f"{{{nsmap['itunes']}}}category", text=metadata["itunes_category"])
 
     if "itunes_image" in metadata:
-        itunes_image = ET.SubElement(channel, "itunes:image")
+        itunes_image = ET.SubElement(channel, f"{{{nsmap['itunes']}}}image")
         itunes_image.set("href", metadata["itunes_image"])
 
     # Episodes
@@ -150,9 +150,9 @@ def generate_rss(config, output_file_path):
             episode["publication_date"]
         )
         ET.SubElement(item, "title").text = episode["title"]
-        ET.SubElement(item, "description").text = format_description(
+        ET.SubElement(item, "description").text = ET.CDATA(format_description(
             episode["description"]
-        )
+        ))
         ET.SubElement(item, "guid").text = episode["asset_url"]
         ET.SubElement(
             item,
@@ -163,24 +163,24 @@ def generate_rss(config, output_file_path):
         )
 
         # Apply global itunes:explicit setting to each episode
-        itunes_explicit = ET.SubElement(item, "itunes:explicit")
+        itunes_explicit = ET.SubElement(item, f"{{{nsmap['itunes']}}}explicit")
         itunes_explicit.text = global_explicit
 
         # Add itunes:duration tag
-        itunes_duration = ET.SubElement(item, "itunes:duration")
+        itunes_duration = ET.SubElement(item, f"{{{nsmap['itunes']}}}duration")
         itunes_duration.text = str(file_info["duration"])
 
         # iTunes-specific tags
         if episode.get("episode") is not None:
-            itunes_episode = ET.SubElement(item, "itunes:episode")
+            itunes_episode = ET.SubElement(item, f"{{{nsmap['itunes']}}}episode")
             itunes_episode.text = str(episode["episode"])
 
         if episode.get("season") is not None:
-            itunes_season = ET.SubElement(item, "itunes:season")
+            itunes_season = ET.SubElement(item, f"{{{nsmap['itunes']}}}season")
             itunes_season.text = str(episode["season"])
 
         if episode.get("episode_type") is not None:
-            itunes_episode_type = ET.SubElement(item, "itunes:episodeType")
+            itunes_episode_type = ET.SubElement(item, f"{{{nsmap['itunes']}}}episodeType")
             itunes_episode_type.text = episode["episode_type"]
 
         # Add link if available, if not, use global
@@ -191,7 +191,7 @@ def generate_rss(config, output_file_path):
         itunes_image_url = episode.get("itunes_image", metadata["itunes_image"])
 
         # Creating the 'itunes:image' element with the determined URL
-        itunes_image = ET.SubElement(item, "itunes:image")
+        itunes_image = ET.SubElement(item, f"{{{nsmap['itunes']}}}image")
         itunes_image.set("href", itunes_image_url)
 
     tree = ET.ElementTree(rss)
