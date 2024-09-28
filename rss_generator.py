@@ -1,4 +1,3 @@
-import certifi
 import lxml.etree as ET
 from datetime import datetime
 from email.utils import format_datetime
@@ -21,7 +20,7 @@ def convert_iso_to_rfc2822(iso_date):
 
 
 def get_file_info(url):
-    response = requests.head(url, allow_redirects=True, verify=certifi.where())
+    response = requests.head(url, allow_redirects=True)
 
     # Get duration of audio/video file
     # We're using the response.url here in order to
